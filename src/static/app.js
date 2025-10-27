@@ -54,7 +54,63 @@ document.addEventListener("DOMContentLoaded", () => {
           ul.className = "participants-list";
           details.participants.forEach((p) => {
             const li = document.createElement("li");
-            li.textContent = p;
+            const email = document.createElement("span");
+            email.textContent = p;
+            
+            const deleteIcon = document.createElement("span");
+            deleteIcon.innerHTML = "✕";
+            deleteIcon.className = "delete-participant";
+            deleteIcon.title = "Unregister participant";
+            deleteIcon.addEventListener("click", async () => {
+              try {
+                const response = await fetch(
+                  `/activities/${encodeURIComponent(name)}/unregister?email=${encodeURIComponent(p)}`,
+                  { method: "DELETE" }
+                );
+
+                const result = await response.json();
+
+                if (response.ok) {
+                  // Remove the participant from the list immediately
+                  li.remove();
+                  // Update spots availability
+                  const spots = details.max_participants - (details.participants.length - 1);
+                  availability.innerHTML = `<strong>Availability:</strong> ${spots} spots left`;
+                  
+                  // If this was the last participant, show "No participants yet"
+                  if (details.participants.length === 1) {
+                    ul.remove();
+                    const empty = document.createElement("div");
+                    empty.className = "no-participants";
+                    empty.textContent = "No participants yet";
+                    participantsSection.appendChild(empty);
+                  }
+                  
+                  // Remove from the participants array
+                  details.participants = details.participants.filter(email => email !== p);
+                } else {
+                  messageDiv.textContent = result.detail || "An error occurred";
+                  messageDiv.className = "error";
+                  messageDiv.classList.remove("hidden");
+
+                  setTimeout(() => {
+                    messageDiv.classList.add("hidden");
+                  }, 5000);
+                }
+              } catch (error) {
+                console.error("Error unregistering:", error);
+                messageDiv.textContent = "Failed to unregister participant. Please try again.";
+                messageDiv.className = "error";
+                messageDiv.classList.remove("hidden");
+
+                setTimeout(() => {
+                  messageDiv.classList.add("hidden");
+                }, 5000);
+              }
+            });
+
+            li.appendChild(email);
+            li.appendChild(deleteIcon);
             ul.appendChild(li);
           });
           participantsSection.appendChild(ul);
@@ -101,6 +157,95 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+
+        // Find and update the corresponding activity card
+        const activityCards = document.querySelectorAll('.activity-card');
+        for (const card of activityCards) {
+          const cardTitle = card.querySelector('h4');
+          if (cardTitle && cardTitle.textContent === activity) {
+            // Find or create participants list
+            let participantsSection = card.querySelector('.participants-section');
+            let participantsList = participantsSection.querySelector('.participants-list');
+            let noParticipantsDiv = participantsSection.querySelector('.no-participants');
+
+            // If there was a "No participants yet" message, remove it
+            if (noParticipantsDiv) {
+              noParticipantsDiv.remove();
+            }
+
+            // Create participants list if it doesn't exist
+            if (!participantsList) {
+              participantsList = document.createElement('ul');
+              participantsList.className = 'participants-list';
+              participantsSection.appendChild(participantsList);
+            }
+
+            // Create new participant list item
+            const li = document.createElement('li');
+            const emailSpan = document.createElement('span');
+            emailSpan.textContent = email;
+
+            // Add delete icon
+            const deleteIcon = document.createElement('span');
+            deleteIcon.innerHTML = "✕";
+            deleteIcon.className = "delete-participant";
+            deleteIcon.title = "Unregister participant";
+            deleteIcon.addEventListener("click", async () => {
+              try {
+                const response = await fetch(
+                  `/activities/${encodeURIComponent(activity)}/unregister?email=${encodeURIComponent(email)}`,
+                  { method: "DELETE" }
+                );
+
+                const result = await response.json();
+
+                if (response.ok) {
+                  li.remove();
+                  // Update spots count
+                  const spotsElement = card.querySelector('p:nth-child(4)');
+                  const currentSpots = parseInt(spotsElement.textContent.match(/\d+/)[0]);
+                  spotsElement.innerHTML = `<strong>Availability:</strong> ${currentSpots + 1} spots left`;
+
+                  // If this was the last participant, show "No participants yet"
+                  if (participantsList.children.length === 0) {
+                    participantsList.remove();
+                    const empty = document.createElement("div");
+                    empty.className = "no-participants";
+                    empty.textContent = "No participants yet";
+                    participantsSection.appendChild(empty);
+                  }
+                } else {
+                  messageDiv.textContent = result.detail || "An error occurred";
+                  messageDiv.className = "error";
+                  messageDiv.classList.remove("hidden");
+
+                  setTimeout(() => {
+                    messageDiv.classList.add("hidden");
+                  }, 5000);
+                }
+              } catch (error) {
+                console.error("Error unregistering:", error);
+                messageDiv.textContent = "Failed to unregister participant. Please try again.";
+                messageDiv.className = "error";
+                messageDiv.classList.remove("hidden");
+
+                setTimeout(() => {
+                  messageDiv.classList.add("hidden");
+                }, 5000);
+              }
+            });
+
+            li.appendChild(emailSpan);
+            li.appendChild(deleteIcon);
+            participantsList.appendChild(li);
+
+            // Update spots count
+            const spotsElement = card.querySelector('p:nth-child(4)');
+            const currentSpots = parseInt(spotsElement.textContent.match(/\d+/)[0]);
+            spotsElement.innerHTML = `<strong>Availability:</strong> ${currentSpots - 1} spots left`;
+            break;
+          }
+        }
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
